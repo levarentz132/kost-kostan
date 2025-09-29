@@ -35,4 +35,14 @@ class Room extends Model
         return $this->hasMany(Reservation::class);
     }
 
+    public function occupancies(): HasMany
+    {
+        return $this->hasMany(Occupancy::class);
+    }
+
+    public function currentOccupancy()
+    {
+        return $this->hasOne(Occupancy::class)->where('status', 'active');
+    }
+
 }

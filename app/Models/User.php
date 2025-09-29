@@ -47,5 +47,13 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
-   
+    public function occupancies()
+    {
+        return $this->hasMany(Occupancy::class);
+    }
+
+    public function currentOccupancy()
+    {
+        return $this->hasOne(Occupancy::class)->where('status', 'active');
+    }
 }
