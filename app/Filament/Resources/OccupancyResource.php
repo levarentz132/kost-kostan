@@ -69,6 +69,10 @@ class OccupancyResource extends Resource
                             ->prefix('$')
                             ->step(0.01)
                             ->required(),
+
+                        Forms\Components\DatePicker::make('last_payment_date')
+                            ->label('Last Payment Date')
+                            ->placeholder('Select last payment date'),
                     ])
                     ->columns(2),
 
@@ -116,18 +120,28 @@ class OccupancyResource extends Resource
                     ->label('Phone')
                     ->searchable(),
 
-                Tables\Columns\BadgeColumn::make('status')
+                Tables\Columns\BadgeColumn::make('payment_status')
+                    ->label('Payment Status')
+                    ->getStateUsing(function (Occupancy $record): string {
+                        return $record->getPaymentStatusLabel();
+                    })
                     ->colors([
-                        'info' => Occupancy::STATUS_DEPOSIT,
-                        'success' => Occupancy::STATUS_PAID,
-                        'warning' => Occupancy::STATUS_UNPAID,
-                        'danger' => Occupancy::STATUS_TERMINATED,
+                        'info' => fn ($state): bool => $state === 'Deposit',
+                        'success' => fn ($state): bool => $state === 'Paid',
+                        'warning' => fn ($state): bool => $state === 'Unpaid',
+                        'danger' => fn ($state): bool => $state === 'Terminated',
                     ]),
 
                 Tables\Columns\TextColumn::make('monthly_rent')
                     ->label('Monthly Rent')
                     ->money('USD')
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('last_payment_date')
+                    ->label('Last Payment')
+                    ->date()
+                    ->sortable()
+                    ->placeholder('Not set'),
 
                 Tables\Columns\TextColumn::make('start_date')
                     ->date()
@@ -150,6 +164,33 @@ class OccupancyResource extends Resource
                 Tables\Filters\Filter::make('active_occupancies')
                     ->label('Active Only')
                     ->query(fn (Builder $query): Builder => $query->where('status', '!=', Occupancy::STATUS_TERMINATED))
+                    ->toggle(),
+
+                Tables\Filters\Filter::make('paid_up')
+                    ->label('Paid Up (Last 30 days)')
+                    ->query(fn (Builder $query): Builder => $query->where(function ($q) {
+                        $q->whereNotNull('last_payment_date')
+                            ->where('last_payment_date', '>=', now()->subDays(30))
+                            ->where('status', '!=', Occupancy::STATUS_TERMINATED);
+                    }))
+                    ->toggle(),
+
+                Tables\Filters\Filter::make('overdue_payments')
+                    ->label('Overdue Payments (30+ days)')
+                    ->query(fn (Builder $query): Builder => $query->where(function ($q) {
+                        $q->where('status', '!=', Occupancy::STATUS_TERMINATED)
+                            ->where(function ($subQ) {
+                                $subQ->where(function ($innerQ) {
+                                    // No last payment date and more than 30 days since start
+                                    $innerQ->whereNull('last_payment_date')
+                                        ->where('start_date', '<', now()->subDays(30));
+                                })->orWhere(function ($innerQ) {
+                                    // Last payment more than 30 days ago
+                                    $innerQ->whereNotNull('last_payment_date')
+                                        ->where('last_payment_date', '<', now()->subDays(30));
+                                });
+                            });
+                    }))
                     ->toggle(),
             ])
             ->actions([
