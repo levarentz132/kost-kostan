@@ -13,7 +13,20 @@ return new class extends Migration
     {
         Schema::create('occupants', function (Blueprint $table) {
             $table->id();
+            $table->string('name');
+            $table->string('phone_number');
+            $table->string('job')->nullable();
+            $table->string('email')->nullable();
+            $table->text('address')->nullable();
+            $table->date('date_of_birth')->nullable();
+            $table->enum('gender', ['male', 'female', 'other'])->nullable();
+            $table->string('national_id')->nullable();
+            $table->text('notes')->nullable();
             $table->timestamps();
+            
+            // Add indexes for better query performance
+            $table->index('name');
+            $table->index('phone_number');
         });
     }
 

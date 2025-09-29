@@ -18,7 +18,7 @@ class Occupancy extends Model
 
     protected $fillable = [
         'room_id',
-        'user_id',
+        'occupant_id',
         'start_date',
         'end_date',
         'status',
@@ -37,14 +37,9 @@ class Occupancy extends Model
         return $this->belongsTo(Room::class);
     }
 
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
     public function occupant(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(Occupant::class);
     }
 
     /**

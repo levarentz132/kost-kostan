@@ -5,8 +5,8 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\OccupancyResource\Pages;
 use App\Filament\Resources\OccupancyResource\RelationManagers;
 use App\Models\Occupancy;
+use App\Models\Occupant;
 use App\Models\Room;
-use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -19,35 +19,44 @@ class OccupancyResource extends Resource
 {
     protected static ?string $model = Occupancy::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-users';
-
-    protected static ?string $navigationLabel = 'Occupancies';
-
-    protected static ?string $modelLabel = 'Occupancy';
-
-    protected static ?string $pluralModelLabel = 'Occupancies';
+    protected static ?string $navigationIcon = 'heroicon-o-home-modern';
+    
+    protected static ?string $navigationGroup = 'Management';
+    
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Occupancy Details')
+                Forms\Components\Section::make('Room Assignment')
                     ->schema([
                         Forms\Components\Select::make('room_id')
-                            ->label('Room')
-                            ->options(Room::with('building')->get()->mapWithKeys(function ($room) {
-                                return [$room->id => $room->building->name . ' - Room ' . $room->number];
-                            }))
+                            ->relationship('room', 'number', function ($query) {
+                                return $query->with('building');
+                            })
+                            ->getOptionLabelFromRecordUsing(function ($record) {
+                                return $record->building->name . ' - Room ' . $record->number;
+                            })
                             ->required()
                             ->searchable()
                             ->preload(),
 
-                        Forms\Components\Select::make('user_id')
-                            ->label('Occupant')
-                            ->options(User::all()->pluck('name', 'id'))
+                        Forms\Components\Select::make('occupant_id')
+                            ->relationship('occupant', 'name')
                             ->required()
                             ->searchable()
-                            ->preload(),
+                            ->preload()
+                            ->createOptionForm([
+                                Forms\Components\TextInput::make('name')
+                                    ->required(),
+                                Forms\Components\TextInput::make('phone_number')
+                                    ->required()
+                                    ->tel(),
+                                Forms\Components\TextInput::make('job'),
+                                Forms\Components\TextInput::make('email')
+                                    ->email(),
+                            ]),
 
                         Forms\Components\Select::make('status')
                             ->options(Occupancy::getStatusOptions())
@@ -98,9 +107,13 @@ class OccupancyResource extends Resource
                     ->sortable()
                     ->searchable(),
 
-                Tables\Columns\TextColumn::make('user.name')
+                Tables\Columns\TextColumn::make('occupant.name')
                     ->label('Occupant')
                     ->sortable()
+                    ->searchable(),
+
+                Tables\Columns\TextColumn::make('occupant.phone_number')
+                    ->label('Phone')
                     ->searchable(),
 
                 Tables\Columns\BadgeColumn::make('status')
@@ -109,8 +122,7 @@ class OccupancyResource extends Resource
                         'success' => Occupancy::STATUS_PAID,
                         'warning' => Occupancy::STATUS_UNPAID,
                         'danger' => Occupancy::STATUS_TERMINATED,
-                    ])
-                    ->formatStateUsing(fn (string $state): string => ucfirst($state)),
+                    ]),
 
                 Tables\Columns\TextColumn::make('monthly_rent')
                     ->label('Monthly Rent')
@@ -135,14 +147,10 @@ class OccupancyResource extends Resource
                 Tables\Filters\SelectFilter::make('status')
                     ->options(Occupancy::getStatusOptions()),
 
-                Tables\Filters\SelectFilter::make('room')
-                    ->relationship('room', 'number')
-                    ->searchable()
-                    ->preload(),
-
                 Tables\Filters\Filter::make('active_occupancies')
+                    ->label('Active Only')
                     ->query(fn (Builder $query): Builder => $query->where('status', '!=', Occupancy::STATUS_TERMINATED))
-                    ->label('Active Occupancies'),
+                    ->toggle(),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
@@ -152,8 +160,7 @@ class OccupancyResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ])
-            ->defaultSort('created_at', 'desc');
+            ]);
     }
 
     public static function getRelations(): array
